@@ -18,6 +18,7 @@
   - [DATE](#date)
   - [TIMESTAMP, TIMESTAMPTZ](#timestamp-timestamptz)
   - [TIME](#time)
+  - [INTERVAL](#interval)
   - [UUID](#uuid)
   - [JSON](#json)
   - [ARRAY](#array)
@@ -484,6 +485,18 @@ TIME WITH TIME ZONE
 
 -- Extract hours, minutes, seconds from a time value
 EXTRACT(HOUR FROM LOCALTIME) AS hour
+```
+
+## INTERVAL
+
+```sql
+INTERVAL [fields][(precision)]
+
+INTERVAL '6 months before'
+INTERVAL '2 hours 30 minutes'
+
+-- DEMO
+SELECT NOW()::DATE - INTERVAL '1 year 6 months 100 days' AS interval;
 ```
 
 ## UUID
