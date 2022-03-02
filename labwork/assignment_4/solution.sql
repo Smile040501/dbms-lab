@@ -1,4 +1,3 @@
-/* Creating the database for this assignment */
 /**************************************************************************/
 /* Q1: List the name language and category name of all the movies that have a rental rate below 3. */
 SELECT title as film_name,
