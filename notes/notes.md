@@ -30,42 +30,53 @@
   - [PRIMARY KEY](#primary-key)
   - [FOREIGN KEY](#foreign-key)
   - [GENERATED AS IDENTITY](#generated-as-identity)
-- [PostgreSQL Tutorial](#postgresql-tutorial)
-  - [Creating and Dropping Database](#creating-and-dropping-database)
-  - [Creating and Dropping Table](#creating-and-dropping-table)
-  - [Queries](#queries)
-    - [INSERT](#insert)
-    - [SELECT](#select)
-      - [Operators in WHERE clause](#operators-in-where-clause)
-    - [UPDATE](#update)
-    - [DELETE and TRUNCATE](#delete-and-truncate)
-  - [Updating Table Structure](#updating-table-structure)
-    - [Adding and Dropping a Column](#adding-and-dropping-a-column)
-    - [Change Column Type](#change-column-type)
-    - [Modify Default Value of a Column](#modify-default-value-of-a-column)
-    - [Adding and Dropping a Column Constraint](#adding-and-dropping-a-column-constraint)
-    - [Rename a Column or a Table](#rename-a-column-or-a-table)
-  - [Queries on Multiple Relations/Tables](#queries-on-multiple-relationstables)
-  - [String Operations](#string-operations)
-  - [Ordering](#ordering)
-  - [Set operations](#set-operations)
-  - [Aggregation Functions](#aggregation-functions)
-  - [GROUP BY and HAVING clauses](#group-by-and-having-clauses)
-  - [Nested Subqueries](#nested-subqueries)
-  - [Joins](#joins)
-    - [(INNER) JOIN](#inner-join)
-    - [NATURAL JOIN](#natural-join)
-    - [LEFT (OUTER) JOIN](#left-outer-join)
-    - [RIGHT (OUTER) JOIN](#right-outer-join)
-    - [FULL (OUTER) JOIN](#full-outer-join)
-    - [CROSS JOIN](#cross-join)
-    - [Self Join](#self-join)
-  - [View](#view)
-  - [Conditional Expressions](#conditional-expressions)
-  - [Useful Functions](#useful-functions)
-    - [CAST](#cast)
-    - [COALESCE](#coalesce)
-    - [NULLIF](#nullif)
+- [Creating and Dropping DATABASE](#creating-and-dropping-database)
+- [Creating, Copying and Dropping TABLE](#creating-copying-and-dropping-table)
+- [Queries](#queries)
+  - [INSERT](#insert)
+  - [SELECT](#select)
+    - [Operators in WHERE clause](#operators-in-where-clause)
+  - [UPDATE](#update)
+  - [DELETE and TRUNCATE](#delete-and-truncate)
+- [Updating Table Structure](#updating-table-structure)
+  - [Adding and Dropping a Column](#adding-and-dropping-a-column)
+  - [Change Column Type](#change-column-type)
+  - [Modify Default Value of a Column](#modify-default-value-of-a-column)
+  - [Adding and Dropping a Column Constraint](#adding-and-dropping-a-column-constraint)
+  - [Rename a Column or a Table](#rename-a-column-or-a-table)
+- [Queries on Multiple Relations/Tables](#queries-on-multiple-relationstables)
+- [String Operations](#string-operations)
+- [ORDER BY clause](#order-by-clause)
+- [LIMIT and FETCH clauses](#limit-and-fetch-clauses)
+- [Set operations](#set-operations)
+- [Aggregation Functions](#aggregation-functions)
+- [GROUP BY and HAVING clauses](#group-by-and-having-clauses)
+- [Nested Subqueries](#nested-subqueries)
+  - [PostgreSQL Common Table Expressions(CTEs)](#postgresql-common-table-expressionsctes)
+- [Joins](#joins)
+  - [(INNER) JOIN](#inner-join)
+  - [NATURAL JOIN](#natural-join)
+  - [LEFT (OUTER) JOIN](#left-outer-join)
+  - [RIGHT (OUTER) JOIN](#right-outer-join)
+  - [FULL (OUTER) JOIN](#full-outer-join)
+  - [CROSS JOIN](#cross-join)
+  - [Self Join](#self-join)
+- [VIEW](#view)
+  - [Updatable Views](#updatable-views)
+  - [Materialized Views](#materialized-views)
+- [SEQUENCE](#sequence)
+- [Conditional Expressions](#conditional-expressions)
+- [Useful Functions](#useful-functions)
+  - [CAST](#cast)
+  - [COALESCE](#coalesce)
+  - [NULLIF](#nullif)
+  - [RANDOM](#random)
+  - [GENERATE_SERIES](#generate_series)
+  - [Get Database Object Sizes](#get-database-object-sizes)
+- [Users, Roles and Authorization](#users-roles-and-authorization)
+  - [Create Roles](#create-roles)
+  - [GRANT and REVOKE](#grant-and-revoke)
+  - [Role Membership](#role-membership)
 
 # What is PostgreSQL?
 
@@ -155,6 +166,9 @@ $ pg_dump -h host -d dbname -U uname > /path/to/file/dump_name.pgsql
 # Export PostgreSQL database to tar-format archive
 $ pg_dump -h host -d dbname -U uname -F t > /path/to/file/dump_name.tar
 # -F format: Specify the output format.
+
+# Backup all databases
+$ pg_dumpall ...
 ```
 
 ```bash
@@ -511,7 +525,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- computer’s MAC address, current timestamp, and a random value
 SELECT UUID_GENERATE_v1();
 
--- f you want to generate a UUID value solely based on random numbers
+-- if we want to generate a UUID value solely based on random numbers
 SELECT UUID_GENERATE_v4();
 
 -- Create a table with UUID column
@@ -582,7 +596,7 @@ FROM orders;
 
 ```sql
 ARRAY
--- PostgreSQL allows you to define a column to be an array
+-- PostgreSQL allows us to define a column to be an array
 -- of any valid data type including built-in type,
 -- user-defined type or enumerated type.
 
@@ -777,7 +791,7 @@ column_name type GENERATED {ALWAYS | BY DEFAULT} AS IDENTITY[( sequence_option )
 -- If we attempt to insert (or update) values into the `GENERATED ALWAYS AS IDENTITY` column, PostgreSQL will issue an error.
 
 -- The `GENERATED BY DEFAULT` also instructs PostgreSQL to generate a value for the identity column.
--- However, if you supply a value for insert or update, PostgreSQL will use that value to insert into the identity column instead of using the system-generated value.
+-- However, if we supply a value for insert or update, PostgreSQL will use that value to insert into the identity column instead of using the system-generated value.
 
 -- DEMO1
 CREATE TABLE color (
@@ -830,22 +844,23 @@ ALTER COLUMN column_name
 DROP IDENTITY [ IF EXISTS ];
 ```
 
-# PostgreSQL Tutorial
-
-## Creating and Dropping Database
+# Creating and Dropping DATABASE
 
 ```sql
 CREATE DATABASE dbname;
 
 -- Full syntax
 CREATE DATABASE dbname
-OWNER =  role_name          -- default `postgres`
-TEMPLATE = template
-ENCODING = encoding         -- default `UTF8`
-LC_COLLATE = collate        -- define the sort order of strings that mark the result of the ORDER BY clause if we are using a SELECT statement.
-LC_CTYPE = ctype            -- display the character classification for the new database
-TABLESPACE = tablespace_name  -- define the tablespace name for the new database, and by default, it is the `template database's tablespace`.
-CONNECTION LIMIT = max_concurrent_connection    -- default `-1 (unlimited)`
+WITH
+    OWNER =  role_name          -- default `postgres`
+    TEMPLATE = template
+    ENCODING = encoding         -- default `UTF8`
+    LC_COLLATE = collate        -- define the sort order of strings that mark the result of the ORDER BY clause if we are using a SELECT statement.
+    LC_CTYPE = ctype            -- display the character classification for the new database
+    TABLESPACE = tablespace_name  -- define the tablespace name for the new database, and by default, it is the `template database's tablespace`.
+    ALLOW_CONNECTIONS = true | false
+    CONNECTION LIMIT = max_concurrent_connection    -- default `-1 (unlimited)`
+    IS_TEMPLATE = true | false
 ```
 
 ```sql
@@ -856,7 +871,7 @@ DROP DATABASE dbname;
 DROP DATABASE IF EXISTS dbname;
 ```
 
-## Creating and Dropping Table
+# Creating, Copying and Dropping TABLE
 
 ```sql
 CREATE [TEMP] TABLE [IF NOT EXISTS] table_name (
@@ -880,12 +895,29 @@ CREATE TABLE table_name (
 ```
 
 ```sql
+-- Copying the table
+
+-- Copy a table completely
+CREATE TABLE new_table_name AS
+TABLE existing_table;
+
+-- Copy structure of the table
+CREATE TABLE new_table_name AS
+TABLE existing_table
+WITH NO DATA;
+
+-- Creates a new table and fills it with the data returned by a query
+CREATE TABLE new_table_name AS
+sql_query;
+```
+
+```sql
 DROP TABLE [IF EXISTS] table_name;
 ```
 
-## Queries
+# Queries
 
-### INSERT
+## INSERT
 
 ```sql
 INSERT INTO table_name (column1, column2, ...)
@@ -906,7 +938,7 @@ FROM source_table
 [WHERE conditions];
 ```
 
-### SELECT
+## SELECT
 
 ```sql
 SELECT column1,
@@ -935,7 +967,7 @@ SELECT table_name.column1
 FROM table_name;
 ```
 
-#### Operators in WHERE clause
+### Operators in WHERE clause
 
 ```sql
 =   -- Equality
@@ -966,7 +998,7 @@ IS NULL, IS NOT NULL  -- Test for NULL Values
 EXISTS(subquery);
 ```
 
-### UPDATE
+## UPDATE
 
 ```sql
 UPDATE table_name
@@ -1004,7 +1036,7 @@ RETURNING dept_id,
 -- Default: Returns number of affected rows.
 ```
 
-### DELETE and TRUNCATE
+## DELETE and TRUNCATE
 
 ```sql
 DELETE FROM table_name
@@ -1027,9 +1059,9 @@ TRUNCATE TABLE table_name
 -- RESTRICT: (Default) Decline to truncate if other tables contain the foreign-key references of tables, which are not mentioned in the command.
 ```
 
-## Updating Table Structure
+# Updating Table Structure
 
-### Adding and Dropping a Column
+## Adding and Dropping a Column
 
 ```sql
 ALTER TABLE table_name
@@ -1045,7 +1077,7 @@ ALTER TABLE table_name
 DROP COLUMN column_name CASCADE;
 ```
 
-### Change Column Type
+## Change Column Type
 
 ```sql
 ALTER TABLE table_name
@@ -1057,7 +1089,7 @@ ALTER COLUMN column_name TYPE <new_type>
 -- If the creation is failed, PostgreSQL will raise an issue and ask us to give the USING clause with an expression that is used for alteration.
 ```
 
-### Modify Default Value of a Column
+## Modify Default Value of a Column
 
 ```sql
 ALTER TABLE table_name
@@ -1065,7 +1097,7 @@ ALTER COLUMN column_name
 [SET DEFAULT value | DROP DEFAULT];
 ```
 
-### Adding and Dropping a Column Constraint
+## Adding and Dropping a Column Constraint
 
 ```sql
 ALTER TABLE table_name
@@ -1077,7 +1109,7 @@ ALTER TABLE table_name
 DROP CONSTRAINT constraint_name;
 ```
 
-### Rename a Column or a Table
+## Rename a Column or a Table
 
 ```sql
 ALTER TABLE table_name
@@ -1089,7 +1121,7 @@ ALTER TABLE table_name
 RENAME TO new_table_name;
 ```
 
-## Queries on Multiple Relations/Tables
+# Queries on Multiple Relations/Tables
 
 ```sql
 SELECT name,
@@ -1102,7 +1134,7 @@ WHERE films.film_id = 9
     and film_category.category_id = category.category_id;
 ```
 
-## String Operations
+# String Operations
 
 ```sql
 -- Returns true if the string matches the supplied pattern.
@@ -1145,16 +1177,41 @@ FROM table_name
 GROUP BY table_name.ID;
 ```
 
-## Ordering
+# ORDER BY clause
 
 ```sql
+-- Default `ASC`
 SELECT *
 FROM actor
 ORDER BY first_name ASC,
     last_name DESC;
 ```
 
-## Set operations
+# LIMIT and FETCH clauses
+
+-   Both are same
+-   `LIMIT` only works in PostgreSQL
+-   `FETCH` is compatible with other database systems
+    -   `FETCH` does not preserve the order of the rows, so should be used with `ORDER BY` clause
+
+```sql
+SELECT column1, column2, ...
+FROM table_name
+LIMIT <num_rows_to_output> [OFFSET <num_rows_to_skip>];
+```
+
+```sql
+SELECT column1, column2, ...
+FROM table_name
+ORDER BY column_name
+OFFSET <start=0> {ROW | ROWS}
+FETCH {FIRST | NEXT} <num_rows_to_output> {ROW | ROWS} ONLY;
+
+-- `ROW` and `ROWS` are synonyms
+-- `FIRST` and `NEXT` are synonyms
+```
+
+# Set operations
 
 -   `UNION (A ∪ B)`
     -   `UNION ALL` (with repetition of columns)
@@ -1169,7 +1226,7 @@ SELECT *
 FROM second_table;
 ```
 
-## Aggregation Functions
+# Aggregation Functions
 
 ```sql
 --  Counts the number of rows in a table
@@ -1205,7 +1262,7 @@ SELECT AVG(age)
 FROM clg;
 ```
 
-## GROUP BY and HAVING clauses
+# GROUP BY and HAVING clauses
 
 -   `GROUP BY`: Used to split rows into groups where the GROUP BY condition collects the data across several records and sets the result by one or more columns.
 -   `HAVING`: Used to specify a search condition for a group or an aggregate.
@@ -1278,7 +1335,7 @@ GROUP BY subject
 HAVING SUM(marks) > 200;
 ```
 
-## Nested Subqueries
+# Nested Subqueries
 
 > `Q`: Find the subject where number of students enrolled is greater than the number of students enrolled in the 'geology' subject
 
@@ -1310,9 +1367,25 @@ HAVING AVG(marks) > (
     );
 ```
 
-## Joins
+## PostgreSQL Common Table Expressions(CTEs)
 
-### (INNER) JOIN
+-   Temporary result which we can reference within another SQL statement. They only exist during the execution of the query
+-   Used to simplify complex joins and subqueries
+-   Use them as table or view in other sql statements
+
+```sql
+WITH cte_name (column_list?) AS (
+    CTE_sql_query_definition
+)
+another_sql_statement;
+
+-- `CTE_sql_query_definition` will be treated as the nested subquery that returns a result set
+-- column_list is optional and by default will take all the columns of nested subquery
+```
+
+# Joins
+
+## (INNER) JOIN
 
 `A INNER JOIN B` ≣ `A ∩ B`
 
@@ -1340,7 +1413,7 @@ FROM table1
 INNER JOIN table2 ON table1.column_name = table2.column_name;
 ```
 
-### NATURAL JOIN
+## NATURAL JOIN
 
 ```sql
 -- Default: INNER
@@ -1348,7 +1421,7 @@ FROM table1
 NATURAL [INNER | LEFT | RIGHT] JOIN table2;
 ```
 
-### LEFT (OUTER) JOIN
+## LEFT (OUTER) JOIN
 
 `A LEFT JOIN B` ≣ `A`
 
@@ -1360,7 +1433,7 @@ LEFT [OUTER] JOIN table2 ON [conditions];
 -- We can use USING Clause also
 ```
 
-### RIGHT (OUTER) JOIN
+## RIGHT (OUTER) JOIN
 
 `A RIGHT JOIN B` ≣ `B`
 
@@ -1372,7 +1445,7 @@ RIGHT [OUTER] JOIN table2 ON [conditions];
 -- We can use USING Clause also
 ```
 
-### FULL (OUTER) JOIN
+## FULL (OUTER) JOIN
 
 `A FULL JOIN B` ≣ `A ∪ B`
 
@@ -1384,7 +1457,7 @@ FULL [OUTER] JOIN table2 ON [conditions];
 -- We can use USING Clause also
 ```
 
-### CROSS JOIN
+## CROSS JOIN
 
 ```sql
 -- CARTESIAN JOIN
@@ -1405,7 +1478,7 @@ FROM table1
 INNER JOIN table2 ON TRUE;
 ```
 
-### Self Join
+## Self Join
 
 ```sql
 -- Same table with different alias names
@@ -1418,9 +1491,11 @@ FROM table_name AS t1
 INNER JOIN table_name AS t2 ON join_predicate;
 ```
 
-## View
+# VIEW
 
 -   A VIEW is a pseudo table in PostgreSQL
+-   Named query that provides another way to present data in the database tables
+-   When we create a view, we basically create a query and assign a name to the query
 
 ```sql
 -- REPLACE parameter will replace the view if it already exists.
@@ -1430,7 +1505,96 @@ FROM table(s)
 [WHERE condition(s)];
 ```
 
-## Conditional Expressions
+```sql
+-- Drops the view
+DROP VIEW [IF EXISTS] view_name
+[CASCADE | RESTRICT];
+```
+
+## Updatable Views
+
+A PostgreSQL view is updatable when it meets the following conditions:
+
+-   The defining query of the view **must have exactly one entry** in the `FROM` clause, which can be a table or another updatable view.
+-   The defining query **must not contain** one of the following clauses at the top level: `GROUP BY`, `HAVING`, `LIMIT`, `OFFSET`, `DISTINCT`, `WITH`, `UNION`, `INTERSECT`, and `EXCEPT`.
+-   The selection list **must not contain** any `window function`, any `set-returning function`, or any `aggregate function`
+
+## Materialized Views
+
+-   Materialized views cache the result of a complex and expensive query and allow us to refresh this result periodically.
+
+```sql
+CREATE MATERIALIZED VIEW view_name
+AS
+query
+WITH [NO] DATA;
+
+-- if we want to load data into the materialized view at the creation time,
+-- use the `WITH DATA` option; otherwise, we use `WITH NO DATA`.
+-- In case we use `WITH NO DATA`, the view is flagged as unreadable.
+-- It means that we cannot query data from the view until we load data into it.
+```
+
+```sql
+REFRESH MATERIALIZED VIEW view_name;
+
+-- When we refresh data for a materialized view, PostgreSQL locks the entire table
+-- therefore we cannot query data against it.
+-- To avoid this, we can use the `CONCURRENTLY` option.
+-- For using this, we need to create a `UNIQUE` index for the view first
+CREATE UNIQUE INDEX index_name ON view_name (column);
+REFRESH MATERIALIZED VIEW CONCURRENTLY view_name;
+```
+
+```sql
+DROP MATERIALIZED VIEW view_name;
+```
+
+# SEQUENCE
+
+-   Ordered list of integers
+-   A sequence in PostgreSQL is a user-defined schema-bound object that generates a sequence of integers based on a specified specification.
+-   If sequence is owned by some table column, dropping the table will also drop the sequence automatically.
+
+```sql
+-- Creating a sequence
+CREATE SEQUENCE [ IF NOT EXISTS ] sequence_name
+    [ AS { SMALLINT | INT | BIGINT } ]
+    [ INCREMENT [ BY ] increment ]
+    [ MINVALUE minvalue | NO MINVALUE ]
+    [ MAXVALUE maxvalue | NO MAXVALUE ]
+    [ START [ WITH ] start ]
+    [ CACHE cache ]
+    [ [ NO ] CYCLE ]
+    [ OWNED BY { table_name.column_name | NONE } ]
+
+-- Demo
+CREATE SEQUENCE order_item_id
+START 10
+INCREMENT 10
+MINVALUE 10
+OWNED BY order_details.item_id;
+```
+
+```sql
+-- Getting next value of the sequence
+SELECT NEXTVAL('mysequence');
+```
+
+```sql
+-- List all sequences in the database
+SELECT relname AS sequence_name
+FROM  pg_class
+WHERE  relkind = 'S';
+```
+
+```sql
+-- Deleting sequences
+DROP SEQUENCE [ IF EXISTS ] sequence_name [, ...]
+[ CASCADE | RESTRICT ];
+```
+
+# Conditional Expressions
 
 ```sql
 -- Method1: (Similar to `if-else`)
@@ -1487,19 +1651,19 @@ FROM film
 ORDER BY title;
 ```
 
-## Useful Functions
+# Useful Functions
 
-### CAST
+## CAST
 
 ```sql
 -- Convert a value of one data type into another
 CAST(expression AS target_type);
 
 -- Cast operator `::`
-expression::type
+expression::target_type
 ```
 
-### COALESCE
+## COALESCE
 
 ```sql
 -- It returns the first argument that is not NULL.
@@ -1512,7 +1676,7 @@ SELECT product,
 FROM items;
 ```
 
-### NULLIF
+## NULLIF
 
 ```sql
 -- Returns a null value if argument_1 equals to argument_2,
@@ -1525,3 +1689,138 @@ SELECT id,
     COALESCE(NULLIF(excerpt, ''), LEFT(body, 40))
 FROM posts;
 ```
+
+## RANDOM
+
+-   Returns a random number between 0 and 1.
+
+```sql
+SELECT RANDOM();
+
+-- Generate random number as an integer
+SELECT FLOOR(RANDOM() * (high - low + 1) + low)::INT;
+```
+
+## GENERATE_SERIES
+
+-   Generates a series of integers between two integers
+
+```sql
+SELECT GENERATE_SERIES(1, 5);
+```
+
+## Get Database Object Sizes
+
+```sql
+-- Values
+SELECT PG_COLUMN_SIZE(5::INT);
+
+-- Tables
+SELECT PG_SIZE_PRETTY(PG_RELATION_SIZE('table_name'));  -- Human Readable
+SELECT PG_TOTAL_RELATION_SIZE('table_name'));
+
+-- Database
+SELECT PG_DATABASE_SIZE('dbname'));
+
+-- Indexes
+SELECT PG_INDEXES_SIZE('index_name'));
+
+-- Tablespace
+SELECT PG_TABLESPACE_SIZE('tablespace_name'));
+```
+
+# Users, Roles and Authorization
+
+## Create Roles
+
+-   Users, Roles and Groups are all same in PostgreSQL
+
+```sql
+-- Create Role
+CREATE ROLE role_name;  -- `CREATE USER` does the same thing
+
+-- Display Roles
+SELECT rolname FROM pg_roles;  -- `\du`
+
+-- Role Attributes
+CREATE ROLE role_name WITH <privileges>;
+
+CREATE ROLE role_name
+[WITH]
+    SUPERUSER       -- Will be a superuser
+    CREATEDB        -- Can create DB
+    CREATEROLE      -- Can create roles
+    LOGIN           -- Can Login
+    ENCRYPTED PASSWORD 'pswd'
+    VALID UNTIL 'timestamp' -- To set a date and time after which the role’s pswd is no longer valid
+    CONNECTION LIMIT <num>  -- Number of concurrent connections a role can make
+```
+
+```bash
+# To be able to login with different roles
+# we need to change the authentication mechanism from `peer` to `md5`
+sudo nano /etc/postgresql/<version>/main/pg_hba.conf
+# Change below line
+local   all             all              peer
+# To
+local   all             all              md5
+```
+
+## GRANT and REVOKE
+
+-   To allow the user role to interact with database objects, we need to grant privileges on the database objects to the user role by using the `GRANT` statement.
+-   The `REVOKE` statement revokes previously granted privileges on database objects from a role.
+-   `ALTER` and `DROP` permissions are only given to the superuser and owner of the table.
+
+```sql
+GRANT privilege_list | ALL
+ON [TABLE] table_name | ALL TABLES IN SCHEMA schema_name
+TO  role_name;
+
+GRANT privilege_list | ALL
+ON DATABASE dbname
+TO role_name;
+
+-- privilege_list can be `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, etc.
+
+-- See privileges on a table
+SELECT grantee,
+    table_name,
+    STRING_AGG(
+        DISTINCT privilege_type,
+        ', '
+        ORDER BY privilege_type ASC
+    ) AS privileges
+FROM information_schema.role_table_grants
+WHERE table_name = 'table_name'
+GROUP BY grantee,
+    table_name;
+```
+
+```sql
+REVOKE privilege | ALL
+ON TABLE table_name | ALL TABLES IN SCHEMA schema_name
+FROM role_name;
+```
+
+## Role Membership
+
+-   It is easier to manage roles as a group so that we can grant or revoke privileges from a group as a whole instead of doing it on an individual role.
+-   We create a role that represents a group and then grants membership in the group role to individual roles.
+-   By convention, a group role does not have the `LOGIN` privilege, it means that we will not be able to use the group role to log in to PostgreSQL.
+
+```sql
+CREATE ROLE group_role_name;
+
+CREATE ROLE user_role;
+
+GRANT group_role to user_role;
+```
+
+A role can use privileges of the group role in the following ways:
+
+-   First, a role with the `INHERIT` attribute will automatically have privileges of the group roles of which it is the member, including any privileges inherited by that role.
+    -   The `INHERIT` attribute governs inheritance of grantable privileges (that is, access privileges for database objects and role memberships).
+    -   It does not apply to the special role attributes set by `CREATE ROLE` and `ALTER ROLE`. For example, being a member of a role with `CREATEDB` privilege does not immediately grant the ability to create databases, even if `INHERIT` is set; it would be necessary to become that role via `SET ROLE` before creating a database.
+    -   Be careful with the `CREATEROLE` privilege. There is no concept of inheritance for the privileges of a `CREATEROLE`-role.
+-   Second, a role can use the `SET ROLE role_name;` statement to temporarily become the group role. The role will have privileges of the group role rather than its original login role. Also, the objects are created by the role are owned by the group role, not the login role.
