@@ -77,6 +77,7 @@
   - [Create Roles](#create-roles)
   - [GRANT and REVOKE](#grant-and-revoke)
   - [Role Membership](#role-membership)
+- [Transactions](#transactions)
 
 # What is PostgreSQL?
 
@@ -1824,3 +1825,95 @@ A role can use privileges of the group role in the following ways:
     -   It does not apply to the special role attributes set by `CREATE ROLE` and `ALTER ROLE`. For example, being a member of a role with `CREATEDB` privilege does not immediately grant the ability to create databases, even if `INHERIT` is set; it would be necessary to become that role via `SET ROLE` before creating a database.
     -   Be careful with the `CREATEROLE` privilege. There is no concept of inheritance for the privileges of a `CREATEROLE`-role.
 -   Second, a role can use the `SET ROLE role_name;` statement to temporarily become the group role. The role will have privileges of the group role rather than its original login role. Also, the objects are created by the role are owned by the group role, not the login role.
+
+# Transactions
+
+-   **Definition**: A transaction is a logical unit of work that contains one or more than one SQL statements where either all statements will succeed or all will fail.\
+    The intermediate states between the steps are not visible to other concurrent transactions, and if some failure occurs that prevents the transaction from completing, then none of the steps affect the database at all.
+-   **Properties**:
+    -   `Atomicity`: This property ensures that all the operations of the transactions are complete. It follows all or none property i.e. the transaction should not be partially completed.
+    -   `Consistency`: This property ensures that after all the transactions database is in consistent state i.e. after committing the transaction those changes are properly updated in the database or not.
+    -   `Isolation`: When two transactions are running then both the transactions will have their own privacy i.e. one transaction won't disturb another transaction
+    -   `Durability`: This property ensures that even at the time of system failures the committed data in the database is secure i.e. permanently.
+-   **Commands**:
+    -   `BEGIN`: Used to start a transaction block
+    -   `COMMIT`: Used to save changes to the database
+    -   `ROLLBACK`: Undoes the changes that were issued in the transaction block before it, either fully or till the last **savepoint**
+    -   `SAVEPOINT`: Helps in defining the boundary withing a transaction that allows for a partial rollback. It also gives the user the ability to roll the transaction back to a certain point without rolling back the entire transaction.
+
+```sql
+-- Begin a transaction (any way)
+BEGIN [TRANSACTION | WORK] [transaction_mode, ...];
+
+-- where transaction_mode is one of:
+ISOLATION LEVEL {SERIALIZABLE | READ COMMITTED}
+READ WRITE | READ ONLY
+
+-- Isolation level of a transaction determines what data the transaction
+-- can see when other transactions are running concurrently
+READ COMMITTED -- (default) A statement can only see rows committed before it began
+SERIALIZABLE   -- All statements of the current transaction can only see rows
+               -- committed before the first query or data-modification statement
+               -- was executed in this transaction.
+
+-- Access modes
+READ WRITE  -- (default)
+READ ONLY   -- Prevents all writes to the disk
+```
+
+```sql
+-- Commit a transaction (any way)
+COMMIT [TRANSACTION | WORK];
+-- If any SQL statement throws an error, then the COMMIT will not be executed
+-- and the transaction will be rolled back automatically.
+
+-- Rolling back a transaction (any way)
+ROLLBACK [TRANSACTION | WORK];
+
+-- Creating a savepoint
+SAVEPOINT savepoint_name;
+
+-- Rolling back a transaction to a certain savepoint
+ROLLBACK TO [SAVEPOINT] savepoint_name;
+
+-- Destroying a previously defined savepoint
+-- Makes it unavailable as a rollback point.
+RELEASE [SAVEPOINT] savepoint_name;
+```
+
+```sql
+-- DEMO
+
+-- BEGIN-SAVEPOINT-ROLLBACK-COMMIT
+BEGIN;
+...<sql_statements>...
+SAVEPOINT first_savepoint;
+...<sql_statements>...
+ROLLBACK TO first_savepoint;
+COMMIT;
+
+-- BEGIN-ROLLBACK
+BEGIN;
+...<sql_statements>...
+ROLLBACK;
+
+-- BEGIN-COMMIT
+BEGIN;
+...<sql_statements>...
+COMMIT;
+
+-- Inside Procedures
+CREATE [OR REPLACE] PROCEDURE proc_name(parameter_list)
+LANGUAGE PLPGSQL
+AS $$
+DECLARE
+    -- local variable declarations
+BEGIN
+    ...<sql_statements>...
+    COMMIT;
+    ...<sql_statements>...
+    COMMIT;
+    ...
+END;
+$$;
+```
