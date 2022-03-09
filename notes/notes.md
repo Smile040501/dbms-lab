@@ -73,8 +73,9 @@
   - [RANDOM](#random)
   - [GENERATE_SERIES](#generate_series)
   - [Get Database Object Sizes](#get-database-object-sizes)
-- [Users, Roles and Authorization](#users-roles-and-authorization)
-  - [Create Roles](#create-roles)
+- [Database Users and Privileges](#database-users-and-privileges)
+  - [Users, Groups and Roles](#users-groups-and-roles)
+    - [Client Authentication](#client-authentication)
   - [GRANT and REVOKE](#grant-and-revoke)
   - [Role Membership](#role-membership)
 - [Transactions](#transactions)
@@ -1730,41 +1731,106 @@ SELECT PG_INDEXES_SIZE('index_name'));
 SELECT PG_TABLESPACE_SIZE('tablespace_name'));
 ```
 
-# Users, Roles and Authorization
+# Database Users and Privileges
 
-## Create Roles
+## Users, Groups and Roles
 
--   Users, Roles and Groups are all same in PostgreSQL
+-   **Users**, **Roles** and **Groups** are all represented as `Roles` in PostgreSQL
+    -   We have different commands available for each, but still they all will be created as `Roles`
+
+```sql
+-- Create a user
+-- User by default has `login` privileges
+CREATE USER uname
+[WITH]
+    SYSID uid
+    | CREATEDB | NOCREATEDB
+    | CREATEUSER | NOCREATEUSER
+    | IN GROUP groupname [, ...]   -- list of groups in which user should be added to
+    | [ ENCRYPTED | UNENCRYPTED ] PASSWORD 'password'
+    | VALID UNTIL 'abstime';
+
+-- List set of existing users
+SELECT username FROM pg_user;   -- \du
+
+-- Drop user
+DROP USER uname;
+```
+
+```sql
+-- Create Group
+CREATE GROUP gname
+[WITH]
+    SYSID gid
+   | USER  username [, ...]  -- list of users to include in the group
+
+-- Add or remove user
+ALTER GROUP gname ADD USER uname [, ...];
+ALTER GROUP gname DROP USER uname [, ...];
+
+-- List set of existing groups
+SELECT groname FROM pg_group;   -- \dg
+```
 
 ```sql
 -- Create Role
-CREATE ROLE role_name;  -- `CREATE USER` does the same thing
-
--- Display Roles
-SELECT rolname FROM pg_roles;  -- `\du`
-
--- Role Attributes
-CREATE ROLE role_name WITH <privileges>;
-
 CREATE ROLE role_name
 [WITH]
-    SUPERUSER       -- Will be a superuser
-    CREATEDB        -- Can create DB
-    CREATEROLE      -- Can create roles
-    LOGIN           -- Can Login
-    ENCRYPTED PASSWORD 'pswd'
-    VALID UNTIL 'timestamp' -- To set a date and time after which the role’s pswd is no longer valid
-    CONNECTION LIMIT <num>  -- Number of concurrent connections a role can make
+    SUPERUSER | NOSUPERUSER
+    | CREATEDB | NOCREATEDB
+    | CREATEROLE | NOCREATEROLE
+    | CREATEUSER | NOCREATEUSER
+    | INHERIT | NOINHERIT
+    | LOGIN | NOLOGIN
+    | CONNECTION LIMIT connlimit    -- No. of concurrent connections a role can make
+    | [ ENCRYPTED | UNENCRYPTED ] PASSWORD 'password'
+    | VALID UNTIL 'timestamp'
+    | IN ROLE rolename [, ...]
+    | IN GROUP rolename [, ...]
+    | ROLE rolename [, ...]     -- Creates the newrole a group
+    | ADMIN rolename [, ...]
+    | USER rolename [, ...]
+    | SYSID uid
+
+-- The ADMIN clause is like ROLE, but the named roles are added to the new role
+-- WITH ADMIN OPTION, giving them the right to grant membership in this role to others
+
+-- List set of existing roles
+SELECT rolname FROM pg_roles;  -- `\du`
 ```
 
+### Client Authentication
+
 ```bash
-# To be able to login with different roles
+# `peer` tries to connect with the database with system credentials
+
+# To be able to login with different users
 # we need to change the authentication mechanism from `peer` to `md5`
 sudo nano /etc/postgresql/<version>/main/pg_hba.conf
 # Change below line
 local   all             all              peer
 # To
 local   all             all              md5
+
+# We need to restart the `postgresql` service after changing above file
+
+# We can have separate authentication mechanism for `postgres` and linux user as well
+local   all             postgres         trust  # Won't ask for password
+local   all             mayank           peer
+local   all             all              md5
+```
+
+```bash
+$ psql -U uname     # ERROR
+# Since we haven't mentioned any database, postgres will
+# try to find a database with a same name as this user
+
+# Either create a database with the same name as the user
+
+# Or mention the database name in the command
+$ psql -U uname -d dbname
+
+$ psql -d dbname    # Will login with the default system user
 ```
 
 ## GRANT and REVOKE
@@ -1783,7 +1849,15 @@ ON DATABASE dbname
 TO role_name;
 
 -- privilege_list can be `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, etc.
+```
 
+```sql
+REVOKE privilege | ALL
+ON TABLE table_name | ALL TABLES IN SCHEMA schema_name
+FROM role_name;
+```
+
+```sql
 -- See privileges on a table
 SELECT grantee,
     table_name,
@@ -1796,12 +1870,38 @@ FROM information_schema.role_table_grants
 WHERE table_name = 'table_name'
 GROUP BY grantee,
     table_name;
-```
 
-```sql
-REVOKE privilege | ALL
-ON TABLE table_name | ALL TABLES IN SCHEMA schema_name
-FROM role_name;
+
+-- psql \z command: To obtain info about existing privileges
+-- \z table_name
+=> \z mytable
+
+                        Access privileges for database "lusitania"
+ Schema |  Name   | Type  |                     Access privileges
+--------+---------+-------+-----------------------------------------------------------
+ public | mytable | table | {miriam=arwdRxt/miriam,=r/miriam,"group todos=arw/miriam"}
+(1 row)
+
+-- Interpretation
+              =xxxx -- privileges granted to PUBLIC
+         uname=xxxx -- privileges granted to a user
+   group gname=xxxx -- privileges granted to a group
+
+                  r -- SELECT ("read")
+                  w -- UPDATE ("write")
+                  a -- INSERT ("append")
+                  d -- DELETE
+                  R -- RULE
+                  x -- REFERENCES
+                  t -- TRIGGER
+                  X -- EXECUTE
+                  U -- USAGE
+                  C -- CREATE
+                  T -- TEMPORARY
+            arwdRxt -- ALL PRIVILEGES (for tables)
+                  * -- grant option for preceding privilege
+
+              /yyyy -- user who granted this privilege
 ```
 
 ## Role Membership
@@ -1825,6 +1925,26 @@ A role can use privileges of the group role in the following ways:
     -   It does not apply to the special role attributes set by `CREATE ROLE` and `ALTER ROLE`. For example, being a member of a role with `CREATEDB` privilege does not immediately grant the ability to create databases, even if `INHERIT` is set; it would be necessary to become that role via `SET ROLE` before creating a database.
     -   Be careful with the `CREATEROLE` privilege. There is no concept of inheritance for the privileges of a `CREATEROLE`-role.
 -   Second, a role can use the `SET ROLE role_name;` statement to temporarily become the group role. The role will have privileges of the group role rather than its original login role. Also, the objects are created by the role are owned by the group role, not the login role.
+
+```sql
+-- DEMO
+CREATE ROLE sales_manager;
+
+CREATE DATABASE sales;
+
+GRANT ALL ON DATABASE sales TO sales_manager;
+
+CREATE ROLE ben
+WITH LOGIN PASSWORD 'ben';
+
+GRANT sales_manager TO ben;
+
+REVOKE CONNECT ON DATABASE sales FROM PUBLIC;
+-- Any other user will not be able to connect to this database
+-- Only superusers and those explicitly given privilege access
+-- (in this case sales_manager group, and hence to ben as well) will be able
+-- to connect to that database
+```
 
 # Transactions
 
