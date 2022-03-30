@@ -32,6 +32,8 @@ PL/pgSQL procedural language adds many procedural elements, e.g., control struct
 - [Stored Procedures](#stored-procedures)
 - [Triggers](#triggers)
   - [Create a Trigger](#create-a-trigger)
+    - [Return Value](#return-value)
+    - [Special Variables](#special-variables)
   - [Drop a Trigger](#drop-a-trigger)
   - [Alter a Trigger](#alter-a-trigger)
   - [Disable and Enable a Trigger](#disable-and-enable-a-trigger)
@@ -584,7 +586,6 @@ To create a new trigger in PostgreSQL, we follow these steps:
         -   **INSERT** → we can use only NEW\
             **UPDATE** → we can use both\
             **DELETE** → we can use only OLD
-    -   PostgreSQL also provides other local variables preceded by `TG_` such as `TG_WHEN,` and `TG_TABLE_NAME`.
 
     ```sql
     -- User-defined trigger function
@@ -606,7 +607,7 @@ To create a new trigger in PostgreSQL, we follow these steps:
     ON table_name
     [ FOR [EACH] { ROW | STATEMENT } ]
     [ WHEN ( condition ) ]
-    EXECUTE { FUNCTION | PROCEDURE } trigger_function;
+    EXECUTE { FUNCTION | PROCEDURE } trigger_function (argyments);
 
     # where event can be one of:
         INSERT
@@ -637,6 +638,52 @@ ON accounts
 FOR EACH ROW
 WHEN (OLD.* IS DISTINCT FROM NEW.*)
 EXECUTE FUNCTION log_insert();
+```
+
+### Return Value
+
+-   A trigger function must return either `NULL` or a record/row value having exactly the structure of the table the trigger was fired for.
+-   Returning `NULL` from **row-level triggers** fired `BEFORE` signals the trigger manager to skip the rest of the operation for this row (**i.e. subsequent triggers are not fired, and the `INSERT/UPDATE/DELETE` does not occur for this row**)
+-   If a **non-NULL** value is returned then the operation proceeds with that row value.
+-   To alter the row to be stored, it is possible to replace single values directly in `NEW` and return the modified `NEW`, or to build a complete new record/row to return
+-   In the case of a **before-trigger** on `DELETE`, the returned value has no direct effect, but it has to be **non-NULL** to allow the trigger action to proceed. Usually it is `OLD`.
+-   The return value of a **row-level trigger fired `AFTER`** or a **statement-level trigger** fired BEFORE or AFTER is always ignored, it might as well be NULL. However, any of these types of triggers might still abort the entire operation by **raising an error**.
+### Special Variables
+
+```
+NEW:
+    Data type RECORD
+    Hold new DB row for INSERT/UPDATE operations in row-level triggers
+    NULL in statement-level-triggers and for DELETE operations
+
+OLD:
+    Data type RECORD
+    Hold new DB row for UPDATE/DELETE operations in row-level triggers
+    NULL in statement-level-triggers and for INSERT operations
+
+TG_WHEN:
+    Data type TEXT
+    'BEFORE', 'AFTER', 'INSTEAD OF'
+
+TG_LEVEL:
+    Data type TEXT
+    'ROW', 'STATEMENT'
+
+TG_OP:
+    Data type TEXT
+    'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
+
+TG_TABLE_NAME:
+    Data type NAME
+    Name of the table that caused the trigger invocation
+
+TG_NARGS:
+    Data type INTEGER
+    Number of arguments given to the trigger procedure
+
+TG_ARGV[]:
+    Data type TEXT[]
+    The arguments. Index count from 0. Invalid indexes results in NULL value.
 ```
 
 ## Drop a Trigger
