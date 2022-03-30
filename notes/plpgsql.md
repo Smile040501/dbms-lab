@@ -31,6 +31,10 @@ PL/pgSQL procedural language adds many procedural elements, e.g., control struct
   - [Drop Function](#drop-function)
 - [Stored Procedures](#stored-procedures)
 - [Triggers](#triggers)
+  - [Create a Trigger](#create-a-trigger)
+  - [Drop a Trigger](#drop-a-trigger)
+  - [Alter a Trigger](#alter-a-trigger)
+  - [Disable and Enable a Trigger](#disable-and-enable-a-trigger)
 - [Exception Handling](#exception-handling)
 
 # Getting Started
@@ -561,10 +565,106 @@ WHERE proc_name='name';
 # Triggers
 
 -   A PostgreSQL **trigger** is a function invoked automatically whenever an event such as insert, update, or delete occurs.
--   A trigger is a special user-defined function associated with a table. To create a new trigger, we define a trigger function first, and then bind this trigger function to a table.
+-   A trigger is a special **user-defined function** associated with a table. To create a new trigger, we define a trigger function first, and then bind this trigger function to a table.
 -   The difference between a trigger and a user-defined function is that a trigger is automatically invoked when a triggering event occurs.
 -   PostgreSQL provides two main types of triggers: **row-level triggers** and **statement-level triggers**. The differences between the two kinds are how many times the trigger is invoked and at what time.
+    -   For example, if we issue an `UPDATE` command, which affects 10 rows, the **row-level trigger** will be invoked **10 times**, on the other hand, the **statement-level trigger** will be invoked **1 time**.
+-   We can specify whether the trigger is invoked **before** or **after** an event. If the trigger is invoked before an event, it can skip the operation for the current row or even change the row being updated or inserted. In case the trigger is invoked after the event, all changes are available to the trigger.
 -   PostgreSQL requires us to define a user-defined function as the action of the trigger, while the SQL standard allows us to use any SQL commands.
+
+## Create a Trigger
+
+To create a new trigger in PostgreSQL, we follow these steps:
+
+-   First, create a trigger function using `CREATE FUNCTION` statement.
+
+    -   **A trigger function does not take any arguments and has a return value with the type `TRIGGER`**
+    -   A trigger function receives data about its calling environment through a special structure called TriggerData which contains a set of local variables.
+    -   `OLD` and `NEW` represent the states of the row in the table before or after the triggering event.
+        -   **INSERT** → we can use only NEW\
+            **UPDATE** → we can use both\
+            **DELETE** → we can use only OLD
+    -   PostgreSQL also provides other local variables preceded by `TG_` such as `TG_WHEN,` and `TG_TABLE_NAME`.
+
+    ```sql
+    -- User-defined trigger function
+    CREATE FUNCTION trigger_function()
+    RETURNS TRIGGER
+    LANGUAGE PLPGSQL
+    AS $$
+    BEGIN
+        -- trigger logic
+    END;
+    $$;
+    ```
+
+-   Second, bind the trigger function to a table by using `CREATE TRIGGER` statement.
+
+    ```sql
+    CREATE [ OR REPLACE ] TRIGGER trigger_name
+    { BEFORE | AFTER | INSTEAD OF } { event }
+    ON table_name
+    [ FOR [EACH] { ROW | STATEMENT } ]
+    [ WHEN ( condition ) ]
+    EXECUTE { FUNCTION | PROCEDURE } trigger_function;
+
+    # where event can be one of:
+        INSERT
+        UPDATE [ OF column_name [, ...] ]
+        DELETE
+        TRUNCATE
+    ```
+
+    -   The `WHEN` condition can refer to columns of the old and/or new row values using `OLD` and `NEW` keywords.
+    -   Procedures and functions are equivalent when we talk about triggers as functions are not taking any arguments.
+
+**Example**
+
+```sql
+CREATE OR REPLACE FUNCTION log_insert()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+    RAISE NOTICE 'INSERT: %', NEW;
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER log_insert_trigger
+AFTER UPDATE
+ON accounts
+FOR EACH ROW
+WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE FUNCTION log_insert();
+```
+
+## Drop a Trigger
+
+```sql
+DROP TRIGGER [IF EXISTS] trigger_name
+ON table_name [ CASCADE | RESTRICT ];
+```
+
+## Alter a Trigger
+
+```sql
+ALTER TRIGGER trigger_name
+ON table_name
+RENAME TO new_trigger_name;
+```
+
+## Disable and Enable a Trigger
+
+```sql
+ALTER TABLE table_name
+DISABLE TRIGGER trigger_name | ALL;
+```
+
+```sql
+ALTER TABLE table_name
+ENABLE TRIGGER trigger_name |  ALL;
+```
 
 # Exception Handling
 
