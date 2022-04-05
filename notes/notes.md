@@ -79,6 +79,14 @@
   - [GRANT and REVOKE](#grant-and-revoke)
   - [Role Membership](#role-membership)
 - [Transactions](#transactions)
+- [Indexing](#indexing)
+  - [Index Types](#index-types)
+  - [Creating an Index](#creating-an-index)
+  - [Dropping an Index](#dropping-an-index)
+  - [List Indexes](#list-indexes)
+  - [Index on Expression](#index-on-expression)
+  - [Re-Index](#re-index)
+  - [Example](#example)
 
 # What is PostgreSQL?
 
@@ -2037,3 +2045,172 @@ BEGIN
 END;
 $$;
 ```
+
+# Indexing
+
+Indexing is the technique used for accessing the contents of a database quickly.
+
+## Index Types
+
+-   **B-Tree**: A B-Tree index breaks down the database into a tree like structure, with the starting node being the root node and finally terminating with the leaf node.
+    -   Use B-tree index whenever index columns are involved in a comparison that uses one of the following operators:
+        ```sql
+        <
+        <=
+        =
+        >=
+        BETWEEN
+        IN
+        IS NULL
+        IS NOT NULL
+        ```
+        ```sql
+        LIKE
+        ILIKE
+        ~ '^...'
+        ~*
+        ```
+-   **Hash**: A Hash index is a data structure which accelerates query searches. It uses a key and a hash function for this purpose.
+    -   Hash indexes can handle only simple equality comparison `(=)`
+-   **GIN (Generalized Inverted Index)**: GIN indexes are most useful when you have multiple values stored in a single column. Ex: array
+
+## Creating an Index
+
+```sql
+CREATE [UNIQUE] INDEX index_name
+ON table_name [USING method]
+(
+    column_name [ASC | DESC] [NULLS {FIRST | LAST}],
+    ...
+)
+[WHERE condition];
+
+-- UNIQUE enforces the uniqueness of values in one or multiple columns
+
+-- Index method could be:
+BTREE -- Default
+HASH, GIN, GIST, SPGIST, BRIN
+
+-- ASC and DESC specify the sort order
+ASC -- Default
+
+
+-- `NULLS FIRST` and `NULL LAST` specifies nulls sort before or after non-nulls
+NULLS FIRST -- Default when DESC is specified
+NULLS LAST  -- Default when DESC is not specified
+
+-- `WHERE` condition will make this index a partial index
+```
+
+```sql
+ANALYZE -- Returns the time to execute the query
+EXPLAIN -- Tells the execution plan of the query
+
+EXPLAIN ANALYZE
+<query>;
+
+-- Example
+EXPLAIN ANALYZE
+SELECT *
+FROM <table>;
+```
+
+```sql
+-- After creating the index, the query time can be enhanced or slowed down
+EXPLAIN ANALYZE
+<query>;
+```
+
+## Dropping an Index
+
+```sql
+-- Dropping an index
+DROP INDEX  [ CONCURRENTLY]
+[ IF EXISTS ]  index_name
+[ CASCADE | RESTRICT ];
+```
+
+## List Indexes
+
+```sql
+-- List all the indexes of the `public` schema
+SELECT
+    tablename,
+    indexname,
+    indexdef
+FROM
+    pg_indexes
+WHERE
+    schemaname = 'public'
+ORDER BY
+    tablename,
+    indexname;
+```
+
+```sql
+-- List all the indexes of a particular table
+SELECT
+    indexname,
+    indexdef
+FROM
+    pg_indexes
+WHERE
+    tablename = 'table_name';
+```
+
+```sql
+-- psql
+\d table_name
+```
+
+## Index on Expression
+
+```sql
+CREATE INDEX index_name
+ON table_name (expression);
+```
+
+-   Once you define an index expression, PostgreSQL will consider using that index when the expression that defines the index appears in the `WHERE` clause or in the `ORDER BY` clause of the SQL statement.
+-   Indexes on expressions are quite expensive to maintain
+
+## Re-Index
+
+-   In practice, an index can become corrupted and no longer contains valid data due to hardware failures or software bugs. To recover the index, we can use the `REINDEX` statement:
+
+```sql
+REINDEX [ ( VERBOSE ) ] { INDEX | TABLE | SCHEMA | DATABASE | SYSTEM } name;
+```
+
+## Example
+
+```sql
+-- Creating a Table
+CREATE TABLE sample (
+	title TEXT,
+	treatment TEXT
+);
+
+-- Add random 10000 tuples to the table
+INSERT INTO sample2(title2, treatment2)
+SELECT MD5(RANDOM()::TEXT), MD5(RANDOM()::TEXT)
+FROM (
+	SELECT *
+	FROM generate_series(1, 10000) AS id
+) AS x;
+
+-- Analyzing this query
+EXPLAIN ANALYZE
+SELECT *
+FROM sample2
+WHERE title2 ILIKE '%eca%';
+
+-- Extension for the operators used
+CREATE EXTENSION pg_trgm;
+
+-- Indexing the table
+CREATE INDEX sample2_index2
+ON sample2
+USING GIN(title2 GIN_TRGM_OPS, treatment2 GIN_TRGM_OPS);
+```
+
+-   When defining a **multi-column index**, you should place the columns which are often used in the `WHERE` clause at the beginning of the column list and the columns that are less frequently used in the condition after.
