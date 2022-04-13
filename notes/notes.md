@@ -87,6 +87,9 @@
   - [Index on Expression](#index-on-expression)
   - [Re-Index](#re-index)
   - [Example](#example)
+  - [Partial Index](#partial-index)
+  - [Multi-Column Index](#multi-column-index)
+  - [Covering Index](#covering-index)
 
 # What is PostgreSQL?
 
@@ -2083,6 +2086,7 @@ ON table_name [USING method]
     column_name [ASC | DESC] [NULLS {FIRST | LAST}],
     ...
 )
+[ INCLUDE ( column_name [, ...] ) ]
 [WHERE condition];
 
 -- UNIQUE enforces the uniqueness of values in one or multiple columns
@@ -2098,6 +2102,8 @@ ASC -- Default
 -- `NULLS FIRST` and `NULL LAST` specifies nulls sort before or after non-nulls
 NULLS FIRST -- Default when DESC is specified
 NULLS LAST  -- Default when DESC is not specified
+
+-- `INCLUDE` specifies a list of columns that will be included in the index as non-key columns
 
 -- `WHERE` condition will make this index a partial index
 ```
@@ -2214,3 +2220,35 @@ USING GIN(title2 GIN_TRGM_OPS, treatment2 GIN_TRGM_OPS);
 ```
 
 -   When defining a **multi-column index**, you should place the columns which are often used in the `WHERE` clause at the beginning of the column list and the columns that are less frequently used in the condition after.
+
+## Partial Index
+
+A partial index covers just a subset of table's data. It is an index which is required for a query involving the `WHERE` clause to select data from a table.
+
+```sql
+CREATE INDEX index_name
+ON table_name (column_name)
+WHERE condition;
+```
+
+## Multi-Column Index
+
+It is an index which is created on multiple columns together in a clubbed way so that the accessing time for both the columns becomes fast. It is an index on columns (a, b) which can be used by queries involving `WHERE a = x AND b = y` clause.
+
+```sql
+CREATE INDEX index_name
+ON table_name (col1, col2, ...);
+```
+
+-   **Order in which we are creating the index also matters.** Index are created based on unique entries. We need to specifically focus on which data is more in that particular table and should give it as the first priority over the others in the column list.
+-   Multi-column indexes are faster than the covering indexes.
+
+## Covering Index
+
+A covering index is a special case of an index used in database where all required fields for a query are included in the index only. In other words, the index itself contains the all the required data to execute the queries without having to execute additional reads.
+
+```sql
+CREATE INDEX index_name
+ON table_name (col1)
+INCLUDE(col2);
+```
