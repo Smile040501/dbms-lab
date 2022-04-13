@@ -2247,6 +2247,8 @@ ON table_name (col1, col2, ...);
 
 A covering index is a special case of an index used in database where all required fields for a query are included in the index only. In other words, the index itself contains the all the required data to execute the queries without having to execute additional reads.
 
+-   Covering index is majorly used to reduce the heap fetch time of the attributes required in the `SELECT` clause
+
 ```sql
 CREATE INDEX index_name
 ON table_name (col1)
