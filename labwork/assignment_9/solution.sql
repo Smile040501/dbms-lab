@@ -65,8 +65,8 @@ WHERE rental_rate > '3'
 	AND length > '100';
 
 CREATE INDEX rental_rate_length
-ON film(rental_rate)
-INCLUDE(length);
+ON film(length, rental_rate)
+INCLUDE(title);
 
 DROP INDEX rental_rate_length;
 
