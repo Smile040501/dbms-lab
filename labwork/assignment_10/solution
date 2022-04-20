@@ -1,0 +1,260 @@
+/* **************************************************************************/
+/* Q1 */
+
+use funcart
+
+db.createUser({
+    user: "Mayank",
+    pwd: "mayank",
+    roles: ["readWrite", "dbAdmin"]
+})
+
+
+/* **************************************************************************/
+/* Q2 */
+
+db.createCollection("products")
+
+db.products.insertMany([
+    {
+        name: "iPhone X",
+        category: "Phones",
+        supplier: "Apple",
+        subcategory: "Smartphones",
+        MRP: "Rs. 60000",
+    },
+    {
+        name: "iPhone XS",
+        category: "Phones",
+        supplier: "Apple",
+        subcategory: "Smartphones",
+        MRP: "Rs. 70000",
+    },
+    {
+        name: "iPhone XR",
+        category: "Phones",
+        supplier: "Apple",
+        subcategory: "Smartphones",
+        MRP: "Rs. 50000",
+    },
+    {
+        name: "iPhone XS Max",
+        category: "Phones",
+        supplier: "Apple",
+        subcategory: "Smartphones",
+        MRP: "Rs. 80000",
+    },
+    {
+        name: "iPhone 8",
+        category: "Phones",
+        supplier: "Apple",
+        subcategory: "Smartphones",
+        MRP: "Rs. 40000",
+    }
+])
+
+
+/* **************************************************************************/
+/* Q3 */
+db.products.updateOne(
+    { name: "iPhone X" },
+    {
+        $set: {
+            reviews: [
+                {
+                    title: "good product",
+                    description: "very good product",
+                    user: "Mayank"
+                },
+                {
+                    title: "bad product",
+                    description: "very bad product",
+                    user: "Dr. Strange"
+                },
+                {
+                    title: "nice product",
+                    description: "very nice product",
+                    user: "Scarlet Witch"
+                }
+            ]
+        }
+    }
+)
+
+db.products.updateOne(
+    { name: "iPhone XS" },
+    {
+        $set: {
+            reviews: [
+                {
+                    title: "Liked product",
+                    description: "very good product",
+                    user: "Mayank"
+                },
+                {
+                    title: "bad product",
+                    description: "very bad product",
+                    user: "Dr. Strange"
+                },
+                {
+                    title: "nice product",
+                    description: "very nice product",
+                    user: "Scarlet Witch"
+                }
+            ]
+        }
+    }
+)
+
+db.products.updateOne(
+    { name: "iPhone XR" },
+    {
+        $set: {
+            reviews: [
+                {
+                    title: "awesome pro",
+                    description: "very good product",
+                    user: "Mayank"
+                },
+                {
+                    title: "bad product",
+                    description: "very bad product",
+                    user: "Dr. Strange"
+                },
+                {
+                    title: "nice product",
+                    description: "very nice product",
+                    user: "Scarlet Witch"
+                }
+            ]
+        }
+    }
+)
+
+db.products.updateOne(
+    { name: "iPhone XS Max" },
+    {
+        $set: {
+            reviews: [
+                {
+                    title: "Wishlist product",
+                    description: "very good product",
+                    user: "Mayank"
+                },
+                {
+                    title: "good product",
+                    description: "very bad product",
+                    user: "Dr. Strange"
+                },
+                {
+                    title: "nice product",
+                    description: "very nice product",
+                    user: "Scarlet Witch"
+                }
+            ]
+        }
+    }
+)
+
+db.products.updateOne(
+    { name: "iPhone 8" },
+    {
+        $set: {
+            reviews: [
+                {
+                    title: "Wishlist product",
+                    description: "very good product",
+                    user: "Mayank"
+                },
+                {
+                    title: "good product",
+                    description: "very bad product",
+                    user: "Dr. Strange"
+                },
+                {
+                    title: "good product",
+                    description: "very nice product",
+                    user: "Scarlet Witch"
+                }
+            ]
+        }
+    }
+)
+
+/* **************************************************************************/
+/* Q4 */
+
+db.products.find(
+    { "reviews.title": "good product" },
+    { name: 1, _id: 0 }
+)
+
+/* **************************************************************************/
+/* Q5 */
+db.products.updateOne(
+    { name: "pepsi" },
+    { $set: { category: "soft drinks" } },
+    { upsert: true }
+)
+
+db.products.updateOne(
+    { name: "coca cola" },
+    { $set: { category: "soft drinks" } },
+    { upsert: true }
+)
+
+db.products.find({
+    category: {
+        $eq: db.products.find(
+            { name: "pepsi" },
+            { category: 1, _id: 0 }
+        ).toArray()[0].category
+    }
+})
+
+
+/* **************************************************************************/
+/* Q6 */
+db.products.updateOne(
+    { name: "iPhone X" },
+    { $set: { MRP: 60000 } }
+)
+
+db.products.updateOne(
+    { name: "iPhone XS" },
+    { $set: { MRP: 70000 } }
+)
+
+db.products.updateOne(
+    { name: "iPhone XR" },
+    { $set: { MRP: 50000 } }
+)
+
+db.products.updateOne(
+    { name: "iPhone XS Max" },
+    { $set: { MRP: 80000 } }
+)
+
+db.products.updateOne(
+    { name: "iPhone 8" },
+    { $set: { MRP: 40000 } }
+)
+
+db.products.updateOne(
+    { name: "pepsi" },
+    { $set: { MRP: 50 } }
+)
+
+db.products.updateOne(
+    { name: "coca cola" },
+    { $set: { MRP: 40 } }
+)
+
+db.products.aggregate([
+    {
+        $group: {
+            _id: "$category",
+            totalMRP: { $sum: "$MRP" }
+        }
+    }
+])
