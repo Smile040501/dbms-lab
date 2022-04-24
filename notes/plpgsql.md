@@ -607,7 +607,7 @@ To create a new trigger in PostgreSQL, we follow these steps:
     ON table_name
     [ FOR [EACH] { ROW | STATEMENT } ]
     [ WHEN ( condition ) ]
-    EXECUTE { FUNCTION | PROCEDURE } trigger_function (argyments);
+    EXECUTE { FUNCTION | PROCEDURE } trigger_function (arguments);
 
     # where event can be one of:
         INSERT
