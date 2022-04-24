@@ -23,6 +23,7 @@
   - [JSON](#json)
   - [ARRAY](#array)
   - [User-Defined Data Types](#user-defined-data-types)
+- [Extensions](#extensions)
 - [Table Constraints](#table-constraints)
   - [NOT NULL](#not-null)
   - [UNIQUE](#unique)
@@ -205,113 +206,112 @@ $ pg_restore -h host -d dbname -c -C -U uname -v /path/to/file/dump_name.tar
 ## Interactive Terminal Commands
 
 ```bash
-# List all the users and their roles
-\du
-\dg[S+]
+# Switches b/w aligned and non-aligned column output
+\a
 
-# Quit psql
-\q
+# Connects to a database under the current user
+\c dbname [username]
+# Switches connection to a new database under a specified user
 
-# List all the available databases
-\l
+# Change the current working directory
+# Without argument switches to the HOME
+\cd [directory]
 
-# Connect to a database under the current user
-\c dbname
+# Outputs information about the current database connection.
+\conninfo
 
-\c dbname username # Switch connection to a new database under a specified user
-
-# List everything available in the current database
-\d
-
-# List all the tables in the current database
-\dt
+# Lists everything available in the current database
+\d[S+] [pattern]
 
 # Describe a table such as column, type,
 # modifiers of columns, indexes, integrity constraints, etc.
 \d table_name
 
-# Execute an SQL File which has SQL queries written in it
-\i /path/to/file.sql
+\da[S]      # Aggregate functions
+\dA[+]      # All access methods
+\dD[S+]     # All Domains
+\dE[S+]     # Foreign Table
+\di[S+]     # Index
+\dL[S+]     # Procedural Languages
+\dm[S+]     # Materialized View
+\dn[S+]     # Schema
+\do[S+]     # Operators
+\ds[S+]     # Sequence
+\dt[S+]     # Table
+\dT[S+]     # Data Types
+\du[S+]     # Users
+\dv[S+]     # View
+\dx[S+]     # Installed Extensions
+\dy[+]      # Event triggers
 
-# Get help on psql commands
-\?
+\df[anptwS+]    # Functions
+# a: aggregate
+# n: normal
+# p: procedural
+# t: trigger
+# w: window
 
-# Get help on specific PostgreSQL statement
-\h ALTER TABLE
-
-# List all the schemas of the currently connected database
-\dn
-
-# List all the available functions in the current database
-\df
-
-\sf[+] funcname   # Shows function's definition
-
-# List all the available views in the current database
-\dv
-\dm[S+]    # List materialized views
-\sv[+] viewname   # Shows views's definition
-
-# Lists tables, views and sequences with their associated access privileges
-\dp
+# Lists objects with their associated access privileges
+\dp or \Z
 \ddp    # default privileges
 
-# List all access methods
-\dA+
-
-# List event triggers
-\dy[+]
-
-# List all the available domains in the current database
-\dD
-
-# List all user-defined types in the current database
-\dT+
-
-# List indexes
-\di[S+]
-
-# List procedural languages
-\dL[S+]
-
-# List all tablespaces
-\db+
-
-# List extensions
-\dx[+]
-
-# Arranges to save future query results to the file <filename>, or
-# Pipe future results to the shell command <command>
-# If no argument is specified, the query output is reset to the standard output.
-\o <filename>
-\o | <command>
-
-# Turn ON/OFF query execution time
-\timing
-
-# Change the password of the specified user (default is current user)
-\password ?uname
+# Edits the filename in editor mode
+# Copy query to buffer on close
+\e [filename]
 
 # Execute the previous command
 \g
 
-# Prints psql's command line history to filename
-\s ?filename
-
-# Switch b/w aligned and non-aligned column output
-\a
+# Get help on specific PostgreSQL statement
+\h ALTER TABLE
 
 # Formats the output to HTML format
-\H
+\H or \html
 
-# Change the current working directory
-\cd directory
+# Execute an SQL File which has SQL queries written in it
+\i /path/to/file.sql
 
-# Prints the current working directory
-\! pwd
+# Implements nestable conditional blocks
+\if expression
+\elif expression
+\else
+\endif
 
-# Clears the psql console
-\! clear
+# Lists all the available databases
+\l
+
+# Arranges to save future query results to the file <filename>, or
+# Pipe future results to the shell command <command>
+# If no argument is specified, the query output is reset to STDOUT
+\o <filename>
+\o | <command>
+
+# Change the password of the specified user
+# Default is current user
+\password [uname]
+
+# Quits psql
+\q
+
+# Resets the query buffer
+\r
+
+
+\sf[+] funcname   # Shows function's definition
+\sv[+] viewname   # Shows views's definition
+
+
+# Prints psql's command line history to filename
+\s [filename]
+
+# Turn ON/OFF query execution time
+\timing [on | off]
+
+# Get help on psql commands
+\?
+
+# Execute sub-shell command
+\! [command]
 ```
 
 # PostgreSQL Data Types
@@ -679,6 +679,30 @@ CREATE TYPE FILM_SUMMARY AS (
 );
 
 CREATE TYPE FRUITS_NAME AS ENUM ('Mango', 'Apple', 'Orange', 'Strawberry');
+```
+
+# Extensions
+
+```sql
+CREATE EXTENSION [ IF NOT EXISTS ] extension_name;
+
+-- Useful extensions
+plpgsql
+uuid-ossp
+intarray
+pg_trgm
+hstore
+pgcrypto
+
+-- See extensions
+SELECT *
+FROM pg_available_extensions_versions;
+
+SELECT *
+FROM pg_available_extensions;
+
+-- Update version
+ALTER EXTENSION extension_name UPDATE [ TO new_version ];
 ```
 
 # Table Constraints
