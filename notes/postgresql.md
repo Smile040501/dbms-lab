@@ -79,6 +79,15 @@
     - [Client Authentication](#client-authentication)
   - [GRANT and REVOKE](#grant-and-revoke)
   - [Role Membership](#role-membership)
+  - [Column Level Security](#column-level-security)
+    - [Enabling](#enabling)
+    - [Column Level Permissions](#column-level-permissions)
+    - [Column Level Encryption](#column-level-encryption)
+  - [Row Level Security (RLS)](#row-level-security-rls)
+    - [Enabling RLS on a Table](#enabling-rls-on-a-table)
+    - [Creating a Policy](#creating-a-policy)
+    - [Application Users vs RLS](#application-users-vs-rls)
+  - [CREATE RULE](#create-rule)
 - [Transactions](#transactions)
 - [Indexing](#indexing)
   - [Index Types](#index-types)
@@ -1979,6 +1988,124 @@ REVOKE CONNECT ON DATABASE sales FROM PUBLIC;
 -- Only superusers and those explicitly given privilege access
 -- (in this case sales_manager group, and hence to ben as well) will be able
 -- to connect to that database
+```
+
+-   `RESET ROLE;` resets role to **postgres**
+-   `SESSION_USER` vs `CURRENT_USER`
+
+## Column Level Security
+
+-   We want to allow the user to view only a particular set of columns, making all other columns private by blocking access to them, so users can not see or use those columns when selecting or sorting.
+
+### Enabling
+
+-   Using a **Table View** with the columns and provide the view name to the user instead of the table name
+
+### Column Level Permissions
+
+-   Grant access to particular columns only to the intended user.
+-   User should not have `SELECT` access on the whole table.
+
+```sql
+GRANT SELECT (column_list...)
+ON table_name
+TO role_name;
+```
+
+### Column Level Encryption
+
+-   Another way to secure a column is to **encrypt** just the column data, so the user can access the column but can not see the actual data.
+-   `CREATE EXTENSION pgcrypto;`
+
+    ```sql
+    INSERT INTO table_name
+    VALUES (pgp_sym_encrypt('value', 'secret_key'));
+    ```
+
+-   User can share that value to some other user who has access to see the data and only that user can decrypt the column data as follows:
+    ```sql
+    SELECT pgp_sym_decrypt(col::BYTEA, 'same_secret_key')
+    FROM table_name;
+    ```
+
+## Row Level Security (RLS)
+
+-   Controls which **rows** can be read/modified
+-   This feature enables database administrators to define a policy on a table such that it can control viewing and manipulation of data on a per user basis.
+-    A row-level policy can be understood as an additional filter; when a user tries to perform an operation on a table, this filter is applied before any query condition or filtering, and data is shrunk down or access is denied based on the specific policy.
+-    Row-level security policies can be created specific to a command, such as `SELECT` or DML commands (`INSERT`/`UPDATE`/`DELETE`), or with `ALL`. Row-level security policies can also be created on a particular role or multiple roles.
+
+### Enabling RLS on a Table
+
+```sql
+ALTER TABLE table_name
+ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE table_name
+DISABLE ROW LEVEL SECURITY;
+```
+
+### Creating a Policy
+
+```sql
+CREATE POLICY name ON table_name
+    [ AS { PERMISSIVE | RESTRICTIVE } ]
+    [ FOR { ALL | SELECT | INSERT | UPDATE | DELETE } ]
+    [ TO { role_name | PUBLIC | CURRENT_ROLE | CURRENT_USER | SESSION_USER } [, ...] ]
+    [ USING ( using_expression ) ]
+    [ WITH CHECK ( check_expression ) ]
+
+DROP POLICY name ON table_name;
+```
+
+-   **using_expression**: Existing table rows are checked against the expression specified in the `USING`
+    -   Only operates on rows where the expression evaluates to TRUE
+    -   If the expression evaluates to FALSE, the row is not included in the result set (they are hidden)
+-   **check_expression**: New rows that would be created via `INSERT` or `UPDATE` are checked against the expression specified in `WITH CHECK`.
+    -   If the expression evaluates to TRUE, the operation is performed.
+    -   If the expression evaluates to FALSE, an error is thrown.
+-   Default **deny** policy is assumed if no policy is specified and RLS is enabled.
+-   POLICYs for same command types for the same command are checked using `OR`\
+    POLICYs for different command types for the same command are checked using `AND`
+-   Only table owners can create policies.
+-   Superusers and users with **`BYPASSRLS`** always bypass RLS
+    ```sql
+    ALTER USER uname BYPASSRLS;
+    ```
+-   Table owners bypass RLS by default.\
+    `ALTER TABLE ... FORCE ROW LEVEL SECURITY;`\
+    `ALTER TABLE ... NO FORCE ROW LEVEL SECURITY;`
+
+### Application Users vs RLS
+
+-   It's not feasible to create an explicit role for each application user.
+    -   It is dangerous, as they can login and connect to DB and then change the role using `SET ROLE`
+-   We can use **session variables**. They can be initialized each time a new user tries to see data.
+
+```sql
+CREATE POLICY pname
+ON tname FOR ALL TO PUBLIC
+USING (colnam = current_setting('rls.user'));
+
+\c postgres uname
+SET rls.user = 'uname';
+```
+
+-   We have an overhead of setting this variable. We can do this by maintaining a **session_id** for each user in a table along with other login credentials, by having our logic, saving the session_id, validating, refreshing, and based on the session_id, we can set the session variables on our own instead of manually setting them.
+
+## CREATE RULE
+
+-   Defines a new rule applying to a specified table or view.
+-   The PostgreSQL rule system allows one to define an alternative action to be performed on insertions, updates, or deletions in database tables.
+
+```sql
+CREATE [ OR REPLACE ] RULE name AS ON event
+    TO table_name [ WHERE condition ]
+    DO [ ALSO | INSTEAD ] { NOTHING | command | ( command ; command ... ) }
+
+where event can be one of:
+
+    SELECT | INSERT | UPDATE | DELETE
 ```
 
 # Transactions
