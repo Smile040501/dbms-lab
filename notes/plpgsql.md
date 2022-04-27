@@ -28,6 +28,7 @@ PL/pgSQL procedural language adds many procedural elements, e.g., control struct
     - [Calling a user-defined function](#calling-a-user-defined-function)
   - [Function Parameter Modes](#function-parameter-modes)
   - [Function that returns a Table](#function-that-returns-a-table)
+  - [Security Invoker/Definer](#security-invokerdefiner)
   - [Drop Function](#drop-function)
 - [Stored Procedures](#stored-procedures)
 - [Triggers](#triggers)
@@ -521,6 +522,39 @@ $$;
 
 SELECT * FROM get_films('%Star Wars%');
 ```
+
+## Security Invoker/Definer
+
+```sql
+-- Syntax
+CREATE OR REPLACE FUNCTION function_name(param_list)
+RETURNS return_type
+AS $$
+DECLARE
+    -- local variable declarations
+BEGIN
+    -- logic
+    -- `RETURN` to return a value from the function
+END;
+$$ LANGUAGE PLPGSQL
+   SECURITY [INVOKER | DEFINER]
+   -- Set a secure `search_path`: trusted schema(s), then `pg_temp`
+   SET search_path = admin, pg_temp;
+```
+
+-   `SECURITY INVOKER` indicates that the function is to be executed with the privileges of the user that calls it. That is the **default**.
+-   `SECURITY DEFINER` specifies that the function is to be executed with the privileges of the user that owns it.
+-   `search_path`: This variable specifies the order in which schemas are searched when an object is referenced by a simple name with no schema specified.
+    -   Default value: `"$user", public`
+    -   `SHOW search_path;`
+-   By default, execute privilege is granted to `PUBLIC` for newly created functions. Frequently we will wish to restrict use of a security definer function to only some users.
+    ```sql
+    BEGIN;
+    CREATE FUNCTION check_password(uname TEXT, pass TEXT) ... SECURITY DEFINER;
+    REVOKE ALL ON FUNCTION check_password(uname TEXT, pass TEXT) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION check_password(uname TEXT, pass TEXT) TO admins;
+    COMMIT;
+    ```
 
 ## Drop Function
 
