@@ -9,9 +9,12 @@ PL/pgSQL procedural language adds many procedural elements, e.g., control struct
     - [DO Block](#do-block)
 - [Variables and Constants](#variables-and-constants)
   - [Variables](#variables)
-  - [SELECT INTO](#select-into)
   - [Row Type Variables](#row-type-variables)
   - [Record Type Variables](#record-type-variables)
+- [Executing SQL Commands](#executing-sql-commands)
+  - [INTO clause](#into-clause)
+  - [Doing Nothing at all](#doing-nothing-at-all)
+  - [Executing Dynamic Commands](#executing-dynamic-commands)
 - [Reporting Messages and Errors](#reporting-messages-and-errors)
   - [Raising Errors and Reporting Messages](#raising-errors-and-reporting-messages)
   - [Assert](#assert)
@@ -59,6 +62,8 @@ $tag$<string_constant>$tag$
 SELECT $$I'm a string constant that contains a backslash \$$;
 ```
 
+-   Always provide a **tag** when using it with `EXECUTE` command to write an SQL query string.
+
 ## Block Structure
 
 ```sql
@@ -103,34 +108,6 @@ constant_variable_name CONSTANT data_type := expression;
 variable_name table_name.column_name%TYPE;
 variable_name variable%TYPE;
 ```
-
-## SELECT INTO
-
--   Allows us to select data from the database and assign the data to a variable.
--   It can also add data to another table.
-
-```sql
-SELECT select_list
-INTO variable_name
-FROM table_expression;
-
-SELECT select_list
-INTO table_name
-FROM table_expression;
-
--- DEMO
-DO $$
-DECLARE
-   actor_count INT;
-BEGIN
-    -- select the number of actors from the actor table
-    SELECT COUNT(*)
-    INTO actor_count
-    FROM actor;
-END;
-$$;
-```
-
 ## Row Type Variables
 
 -   To store the whole row of a result set returned by the select into statement, we use the row-type variable or row variable.
@@ -152,10 +129,147 @@ row_variable.field_name
 ```sql
 record_variable RECORD;
 
-
 -- To access the individual field of the row
 record_variable.field_name
 ```
+
+# Executing SQL Commands
+
+-   Any SQL command that does not return rows can be executed within a PL/pgSQL function just by writing the command
+-   If the command does return rows (for example `SELECT`, or `INSERT/UPDATE/DELETE` with `RETURNING`):
+    -   When command returns at most one row or we only care about the first row of output, add an `INTO` clause to capture the output
+    -   If we want all the rows, use the command as the data source for a `FOR` loop
+-   Sometimes it is useful to evaluate an expression or SELECT query but discard the result, for example when calling a function that has side-effects but no useful result value.
+    ```sql
+    -- Replace SELECT keyword with PERFORM
+    PERFORM query;
+
+    -- Example
+    PERFORM validate_input(...);
+    ```
+-   Commands involving dynamic data values:
+    -   For optimizable SQL commands, which are `SELECT`, `INSERT`, `UPDATE`, `DELETE`, variable name appearing in the command text is replaced by a query parameter and its value is placed dynamically
+    -   Non-optimizable SQL commands (also called utility commands) are not capable of accepting query parameters. **We need to build the utility command as a string and then `EXECUTE` it**.
+
+## INTO clause
+
+-   Allows us to select data from the database and assign the data to a variable.
+-   It can also add data to another table.
+
+```sql
+SELECT select_expressions INTO [STRICT] target FROM ...;
+INSERT ... RETURNING expressions INTO [STRICT] target;
+UPDATE ... RETURNING expressions INTO [STRICT] target;
+DELETE ... RETURNING expressions INTO [STRICT] target;
+```
+
+-   If `STRICT` is not specified in the `INTO` clause, then target will be set to the first row returned by the command, or to nulls if the command returned no rows
+-   We can check the special **`FOUND`** variable to determine whether a row was returned:
+    -   A `SELECT INTO` statement sets `FOUND` true if a row is assigned, false if no row is returned.
+    -   A `PERFORM` statement sets `FOUND` true if it produces (and discards) one or more rows, false if no row is produced.
+    -   `UPDATE`, `INSERT`, and `DELETE` statements set `FOUND` true if at least one row is affected, false if no row is affected.
+    ```sql
+    SELECT select_expressions INTO target FROM ...;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION '...';
+    END IF;
+    ```
+-   If the `STRICT` option is specified, the command must return exactly one row or a run-time error will be reported, either `NO_DATA_FOUND` (no rows) or `TOO_MANY_ROWS` (more than one row).
+    ```sql
+    BEGIN
+        SELECT select_expressions INTO STRICT target FROM ...;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE EXCEPTION 'not found';
+            WHEN TOO_MANY_ROWS THEN
+                RAISE EXCEPTION 'not unique';
+    END;
+    ```
+-   For `INSERT/UPDATE/DELETE` with `RETURNING`, PL/pgSQL reports an error for more than one returned row, even when `STRICT` is not specified
+
+## Doing Nothing at all
+
+```sql
+IF expression THEN
+    NULL;   -- Placeholder statement that does nothing
+END IF;
+```
+
+## Executing Dynamic Commands
+
+```sql
+EXECUTE command-string
+    [ INTO [STRICT] target ]
+    [ USING expression [, ... ] ];
+
+-- command-string (type TEXT): command to be executed
+-- target: location to store the result of the command
+-- `USING`: supply values to be inserted into the command
+```
+
+-   The command string can use parameter values, which are referenced in the command as `$1`, `$2`, etc. These symbols refer to values supplied in the `USING` clause
+    -   This method is often preferable to inserting data values into the command string as text: it avoids run-time overhead of converting the values to text and back, and it is much less prone to SQL-injection attacks since there is no need for quoting or escaping.
+    ```sql
+    EXECUTE 'SELECT count(*) FROM mytable WHERE inserted_by = $1 AND inserted <= $2'
+    INTO c
+    USING checked_user, checked_date;
+    ```
+-   Note that parameter symbols can only be used for data values only on optimizatble SQL commands.\
+    We can use **FORMAT()'s `%I`** specification to insert table or column names with automatic quoting
+    ```sql
+    EXECUTE format('SELECT count(*) FROM %I '
+    'WHERE inserted_by = $1 AND inserted <= $2', tabname)
+    INTO c
+    USING checked_user, checked_date;
+
+    -- This example relies on the SQL rule that string literals separated by a newline are implicitly concatenated.
+    ```
+-   `QUOTE_IDENT`: Returns the given string suitable quoted to be used as an identifier in an SQL statement. Embedded quotes are properly doubled.\
+    **Identifiers** are names of tables, columns, schemas, sequences...
+    ```sql
+    QUOTE_IDENT('tablename')    -> tablename
+    QUOTE_IDENT('special name') -> "special name"
+    ```
+-   `QUOTE_LITERAL`: Returns the given string suitably quoted to be used as a string literal in an SQL statement string. Embedded single-quotes and backslashes are properly doubled.\
+    **Literals** are some text values.
+    ```sql
+    QUOTE_LITERAL('some \\ text with \' char') -> 'some \\\\ text with '' char'
+    ```
+-   `FORMAT`: Formats arguments according to a format string.
+    ```sql
+    FORMAT(formatstr TEXT, formatarg "ANY")
+
+    -- Format specifiers
+    %[position][flag][width]type
+
+    position : n$   -> n is index of the argument
+    width    : Minimum number of characters
+    flags    : '-' : For left justified
+
+    type :
+    -   `s`: Formats as simple string. Null is empty string
+    -   `I`: Treat the argument value as SQL identifier
+    -   `L`: Treat the argument value as SQL literal
+
+    `%%` : To output % character
+    ```
+-   Example:
+    ```sql
+    CREATE OR REPLACE FUNCTION create_user(
+        uname VARCHAR,
+        pwd VARCHAR
+    )
+    RETURNS VOID
+    AS $$
+    BEGIN
+
+    EXECUTE FORMAT($f$CREATE USER %I IN GROUP users PASSWORD '%s'$f$, uname, pwd);
+
+    END;
+    $$ LANGUAGE PLPGSQL;
+    ```
+
 
 # Reporting Messages and Errors
 
@@ -410,7 +524,6 @@ CONTINUE [block/loop_label] [WHEN condition];
 -- Syntax
 CREATE [OR REPLACE] FUNCTION function_name(param_list)
 RETURNS return_type
-LANGUAGE PLPGSQL
 AS $$
 DECLARE
     -- local variable declarations
@@ -418,12 +531,11 @@ BEGIN
     -- logic
     -- `RETURN` to return a value from the function
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 -- DEMO
 CREATE OR REPLACE FUNCTION square(x INT DEFAULT 0)
 RETURNS INT
-LANGUAGE PLPGSQL
 AS $$
 DECLARE
     result INT;
@@ -431,7 +543,7 @@ BEGIN
     result = x * x;
     RETURN result;
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 ```
 
 ### Calling a user-defined function
@@ -462,7 +574,6 @@ CREATE OR REPLACE FUNCTION get_film_stat(
     OUT max_len INT,
     OUT avg_len NUMERIC
 )
-LANGUAGE PLPGSQL
 AS $$
 BEGIN
     SELECT MIN(length),
@@ -473,7 +584,7 @@ BEGIN
         avg_len
     FROM film;
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 SELECT * FROM get_film_stat();
 ```
@@ -484,7 +595,6 @@ CREATE OR REPLACE FUNCTION swap(
     INOUT x INT,
     INOUT y INT
 )
-LANGUAGE PLPGSQL
 AS $$
 BEGIN
     SELECT x,
@@ -492,7 +602,7 @@ BEGIN
     INTO y,
         x;
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 SELECT swap(19, 13);
 ```
@@ -509,7 +619,6 @@ RETURNS TABLE(
         film_title VARCHAR,
         film_release_year INT
 )
-LANGUAGE PLPGSQL
 AS $$
 BEGIN
     RETURN QUERY
@@ -518,7 +627,7 @@ BEGIN
         FROM film
         WHERE title ILIKE p_pattern;
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 SELECT * FROM get_films('%Star Wars%');
 ```
@@ -572,14 +681,13 @@ DROP FUNCTION [IF EXISTS] function_name(argument_list)
 
 ```sql
 CREATE [OR REPLACE] PROCEDURE proc_name(parameter_list)
-LANGUAGE PLPGSQL
 AS $$
 DECLARE
     -- local variable declarations
 BEGIN
     -- stored procedure body
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 -- Calling a stored procedure
 CALL stored_procedure_name(argument_list);
@@ -625,12 +733,11 @@ To create a new trigger in PostgreSQL, we follow these steps:
     -- User-defined trigger function
     CREATE FUNCTION trigger_function()
     RETURNS TRIGGER
-    LANGUAGE PLPGSQL
     AS $$
     BEGIN
         -- trigger logic
     END;
-    $$;
+    $$ LANGUAGE PLPGSQL;
     ```
 
 -   Second, bind the trigger function to a table by using `CREATE TRIGGER` statement.
@@ -658,13 +765,12 @@ To create a new trigger in PostgreSQL, we follow these steps:
 ```sql
 CREATE OR REPLACE FUNCTION log_insert()
 RETURNS TRIGGER
-LANGUAGE PLPGSQL
 AS $$
 BEGIN
     RAISE NOTICE 'INSERT: %', NEW;
     RETURN NEW;
 END;
-$$;
+$$ LANGUAGE PLPGSQL;
 
 CREATE OR REPLACE TRIGGER log_insert_trigger
 AFTER UPDATE
